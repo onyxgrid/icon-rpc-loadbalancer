@@ -98,13 +98,13 @@ func main() {
 	checkNodes()
 
 	server := &http.Server{
-		Addr:           ":8080",
+		Addr:           ":9000",
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
-	log.Println("Load balancer running on port 8080")
+	log.Println("Load balancer running on port 9000")
 	log.Fatal(server.ListenAndServe())
 
 }

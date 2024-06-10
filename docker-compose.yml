@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  load-balancer:
+    build: .
+    container_name: icon-load-balancer
+    ports:
+      - "9000:9000" # Adjust the ports as needed
+    command: "./main"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "2g"
+    restart: unless-stopped
