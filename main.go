@@ -114,6 +114,8 @@ func forwardRequest(nodes []string, w http.ResponseWriter, r *http.Request) {
 	outerCtx, wrappingCancel := context.WithTimeout(r.Context(), 7*time.Second)
 	defer wrappingCancel()
 
+	fmt.Println("Incoming request from", r.RemoteAddr)
+
 	tried := make(map[int]bool)
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
