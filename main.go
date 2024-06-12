@@ -100,12 +100,12 @@ func main() {
 
 	certManager := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist("testrpc.onyxgrid.com"),
+		HostPolicy: autocert.HostWhitelist("paulrouge.xyz"),
 		Cache:      autocert.DirCache("certs"),
 	}
 
 	server := &http.Server{
-		Addr:           ":9000",
+		Addr:           ":443",
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		IdleTimeout:    120 * time.Second,
