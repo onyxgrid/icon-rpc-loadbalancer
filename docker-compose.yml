@@ -5,7 +5,7 @@ services:
     build: .
     container_name: icon-load-balancer
     ports:
-      - "9000:9000" # Adjust the ports as needed
+      - "443:443" # Adjust the ports as needed
     command: "./main"
     deploy:
       resources:
