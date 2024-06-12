@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/time/rate"
 )
 
@@ -90,12 +91,18 @@ func cleanupVisitors() {
 }
 
 func main() {
-	http.Handle("/", rateLimiter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/api", rateLimiter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		forwardRequest(nodes, w, r)
 	})))
 
 	getValidators()
 	checkNodes()
+
+	certManager := autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist("testrpc.onyxgrid.com"),
+		Cache:      autocert.DirCache("certs"),
+	}
 
 	server := &http.Server{
 		Addr:           ":9000",
@@ -103,13 +110,20 @@ func main() {
 		WriteTimeout:   10 * time.Second,
 		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1 MB
+		TLSConfig:      certManager.TLSConfig(),
 	}
-	log.Println("Load balancer running on port 9000")
-	log.Fatal(server.ListenAndServe())
 
+	log.Println("Load balancer running on port 9000")
+	// log.Fatal(server.ListenAndServe())
+	go server.ListenAndServeTLS("", "")
+	select {}
 }
 
 func forwardRequest(nodes []string, w http.ResponseWriter, r *http.Request) {
+	// for test just return a "hello world" response
+	// w.Write([]byte("Hello, world!"))
+	// return
+
 	// create a wrapping context with a 7-second timeout
 	outerCtx, wrappingCancel := context.WithTimeout(r.Context(), 7*time.Second)
 	defer wrappingCancel()
