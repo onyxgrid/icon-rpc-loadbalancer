@@ -121,8 +121,8 @@ func main() {
 
 func forwardRequest(nodes []string, w http.ResponseWriter, r *http.Request) {
 	// for test just return a "hello world" response
-	// w.Write([]byte("Hello, world!"))
-	// return
+	w.Write([]byte("Hello, world!"))
+	return
 
 	// create a wrapping context with a 7-second timeout
 	outerCtx, wrappingCancel := context.WithTimeout(r.Context(), 7*time.Second)
