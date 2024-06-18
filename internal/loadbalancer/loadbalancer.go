@@ -48,7 +48,7 @@ func New() *LoadBalancer {
 		"https://api.icon.community/api/v3",
 	}
 
-	lb.cleanupVisitors()
+	go lb.cleanupVisitors()
 	return lb
 }
 

@@ -21,8 +21,8 @@ func main() {
 	fmt.Println("Domain is set to: ", domain)
 
 	lb := loadbalancer.New()
-	go lb.GetValidators()
-	go lb.CheckNodes()
+	lb.GetValidators()
+	lb.CheckNodes()
 
 	fmt.Printf("Nodes: %v\n", lb.Nodes)
 
