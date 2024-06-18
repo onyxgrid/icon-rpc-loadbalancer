@@ -20,7 +20,7 @@ func main() {
 	}
 
 	lb := loadbalancer.New()
-	lb.GetValidators()
+	go lb.GetValidators()
 	lb.CheckNodes()
 
 	fmt.Printf("Nodes: %v\n", lb.Nodes)
