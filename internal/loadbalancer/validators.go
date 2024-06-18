@@ -41,7 +41,6 @@ func (lb *LoadBalancer) GetValidators() ([]string, error) {
 		return nil, err
 	}
 
-	//TODO is there a health endpoint? if so, check that before adding to lb.Nodes
 	for _, validator := range res {
 		ip := validator.(map[string]interface{})["api_endpoint"]
 		if ip != nil && ip != "" {
@@ -65,7 +64,6 @@ func (lb *LoadBalancer) CheckNodes() {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 			defer cancel()
-			// var caught *error
 
 			body := map[string]interface{}{
 				"jsonrpc": "2.0",
@@ -76,7 +74,6 @@ func (lb *LoadBalancer) CheckNodes() {
 			// Encode the body to JSON
 			bodyBytes, err := json.Marshal(body)
 			if err != nil {
-				// caught = &err
 				lb.mtx.Lock()
 				for i, node := range lb.Nodes {
 					if node == addr {
@@ -90,7 +87,6 @@ func (lb *LoadBalancer) CheckNodes() {
 			req, err := http.NewRequestWithContext(ctx, "POST", addr, bytes.NewBuffer(bodyBytes))
 			if err != nil {
 				fmt.Println("error creating request:", err)
-				// caught = &err
 				lb.mtx.Lock()
 				for i, node := range lb.Nodes {
 					if node == addr {
@@ -101,12 +97,9 @@ func (lb *LoadBalancer) CheckNodes() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 
-			// Send the request
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				fmt.Println("error sending request:", err, addr)
-
-				// caught = &err
+				// remove node from list
 				lb.mtx.Lock()
 				for i, node := range lb.Nodes {
 					if node == addr {
@@ -118,11 +111,9 @@ func (lb *LoadBalancer) CheckNodes() {
 			}
 			defer resp.Body.Close()
 
-			// Decode the response
 			var res map[string]interface{}
 			if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-				fmt.Println("error decoding response:", err)
-				// caught = &err
+				// remove node from list
 				lb.mtx.Lock()
 				for i, node := range lb.Nodes {
 					if node == addr {
@@ -153,10 +144,5 @@ func (lb *LoadBalancer) CheckNodes() {
 		}(addr)
 	}
 	wg.Wait()
-
-	// for _, node := range lb.Nodes {
-	// 	fmt.Println(node)
-	// }
-
 	fmt.Printf("%d healthy lb.Nodes\n", len(lb.Nodes))
 }

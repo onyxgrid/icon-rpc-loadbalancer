@@ -14,9 +14,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// todo: fix the superfluous stuff in the ForwardRequest function
-// might be fixed by resetting the body of the request in each loop using the io.NopCloser(bytes.NewBuffer(bodyBytes)) line
-
 // Struct to hold rate limiter and block expiration time
 type visitor struct {
 	Limiter  *rate.Limiter
@@ -52,83 +49,6 @@ func New() *LoadBalancer {
 	return lb
 }
 
-func (lb *LoadBalancer) ForwardRequest(Nodes []string, w http.ResponseWriter, r *http.Request) {
-	outerCtx, wrappingCancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer wrappingCancel()
-
-	tried := make(map[int]bool)
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	for len(tried) < len(lb.Nodes) {
-		select {
-		case <-outerCtx.Done():
-			http.Error(w, "Request timeout", http.StatusGatewayTimeout)
-			return
-		default:
-			try := rand.Intn(len(lb.Nodes))
-			if tried[try] {
-				continue
-			}
-
-			node := lb.Nodes[try]
-			tried[try] = true
-
-			ctx, cancel := context.WithTimeout(outerCtx, time.Second)
-			defer cancel()
-
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // reset the body
-			req, err := http.NewRequestWithContext(ctx, r.Method, node+r.RequestURI, r.Body)
-			if err != nil {
-				cancel()
-				continue
-			}
-
-			req.Header = r.Header
-			resp, err := lb.client.Do(req)
-			cancel()
-
-			if err != nil {
-				// if error due to context deadline exceeded, continue to the next node
-				if ctx.Err() == context.DeadlineExceeded {
-					continue
-				}
-				// if error due to connection refused, continue to the next node
-				if opErr, ok := err.(*net.OpError); ok && opErr.Op == "dial" {
-					if opErr.Err.Error() == "connect: connection refused" {
-						continue
-					}
-				}
-				fmt.Println("error in resp node", err.Error())
-				return
-			}
-			defer resp.Body.Close()
-
-			// if ratelimit error, continue to the next node
-			if resp.StatusCode == http.StatusTooManyRequests {
-				continue
-			}
-
-			for k, v := range resp.Header {
-				w.Header()[k] = v
-			}
-			w.WriteHeader(resp.StatusCode)
-			io.Copy(w, resp.Body)
-
-			if resp.StatusCode == http.StatusOK {
-				return
-			} else {
-				fmt.Println("failed getting response from node", node, "with status code", resp.StatusCode)
-			}
-		}
-	}
-	http.Error(w, "All Nodes failed", http.StatusServiceUnavailable)
-}
-
-
 func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWriter, r *http.Request) {
 	outerCtx, wrappingCancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer wrappingCancel()
@@ -163,7 +83,7 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 			defer cancel()
 
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // reset the body
-			req, err := http.NewRequestWithContext(ctx, r.Method, "http://"+node+r.RequestURI, r.Body)
+			req, err := http.NewRequestWithContext(ctx, r.Method,node, r.Body)
 			if err != nil {
 				cancel()
 				continue
@@ -197,6 +117,9 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 			for k, v := range resp.Header {
 				w.Header()[k] = v
 			}
+			// for testing add a header with the node addr
+			w.Header().Set("node-used", node)
+
 			w.WriteHeader(resp.StatusCode)
 			io.Copy(w, resp.Body)
 
