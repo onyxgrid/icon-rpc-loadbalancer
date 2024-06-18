@@ -25,7 +25,7 @@ func main() {
 	//todo make a route for tls connections and a route for non-tls connections
 
 	http.Handle("/api/v3", lb.RateLimiter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		lb.ForwardRequest(lb.Nodes, w, r)
+		lb.ForwardRequestWithSSL(lb.Nodes, w, r)
 	})))
 
 	certManager := autocert.Manager{
