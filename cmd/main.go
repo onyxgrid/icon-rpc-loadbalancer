@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -22,6 +23,8 @@ func main() {
 	lb.GetValidators()
 	lb.CheckNodes()
 
+	fmt.Printf("Nodes: %v\n", lb.Nodes)
+
 	//todo make a route for tls connections and a route for non-tls connections
 
 	http.Handle("/api/v3", lb.RateLimiter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +45,7 @@ func main() {
 		MaxHeaderBytes: 1 << 20, // 1 MB
 		TLSConfig:      certManager.TLSConfig(),
 	}
-
+	fmt.Println("Starting server on port 443")
 	go server.ListenAndServeTLS("", "")
 	select {}
 }
