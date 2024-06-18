@@ -7,6 +7,8 @@ services:
     ports:
       - "443:443" # Adjust the ports as needed
     command: "./main"
+    env_file:
+      - .env
     deploy:
       resources:
         limits:
