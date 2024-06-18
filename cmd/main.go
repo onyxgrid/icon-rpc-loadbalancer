@@ -18,6 +18,7 @@ func main() {
 	if domain == "" {
 		log.Fatal("DOMAIN is not set in env")
 	}
+	fmt.Println("Domain is set to: ", domain)
 
 	lb := loadbalancer.New()
 	go lb.GetValidators()
