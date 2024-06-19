@@ -151,7 +151,7 @@ func (lb *LoadBalancer) RateLimiter(next http.Handler) http.Handler {
 		v, exists := lb.visitors[ip]
 		if !exists {
 			v = &visitor{
-				Limiter: rate.NewLimiter(10, 20), // 10 requests per second, burst of 20
+				Limiter: rate.NewLimiter(100,200), // 100 requests per second, burst of 200
 			}
 			lb.visitors[ip] = v
 		}
