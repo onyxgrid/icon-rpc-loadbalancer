@@ -18,7 +18,7 @@ func main() {
 	if domain == "" {
 		log.Fatal("DOMAIN is not set in env")
 	}
-	fmt.Println("Domain is set to: ", domain)
+	fmt.Println("Domain is set to:", domain)
 
 	lb := loadbalancer.New()
 	lb.GetValidators()
@@ -37,6 +37,8 @@ func main() {
 	}
 
 	tlsConfig := certManager.TLSConfig()
+	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "http/1.1") // Ensure HTTP/1.1 support
+
 	server := &http.Server{
 		Addr:           ":443",
 		ReadTimeout:    10 * time.Second,
@@ -46,7 +48,12 @@ func main() {
 		TLSConfig:      tlsConfig,
 	}
 
+
+	go func() {
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			log.Fatalf("Server failed to start: %v", err)
+		}
+	}()
 	fmt.Println("Starting server on port 443")
-	go server.ListenAndServeTLS("", "")
 	select {}
 }
