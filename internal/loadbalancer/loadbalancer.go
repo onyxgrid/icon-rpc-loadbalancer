@@ -129,9 +129,7 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 			if resp.StatusCode == http.StatusBadRequest {
 				return
 			}
-			else {
-				fmt.Println("failed getting response from node", node, "with status code", resp.StatusCode)
-			}
+			fmt.Println("failed getting response from node", node, "with status code", resp.StatusCode)
 		}
 	}
 	http.Error(w, "All Nodes failed", http.StatusServiceUnavailable)
