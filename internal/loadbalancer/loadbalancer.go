@@ -140,18 +140,27 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 // Takes in a http.Handler, and returns a http.Handler that applies rate limiting on that handler
 func (lb *LoadBalancer) RateLimiter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle preflight requests
+		if r.Method == "OPTIONS" {
+			return
+		}
+		
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			http.Error(w, "Unable to parse IP address", http.StatusInternalServerError)
 			return
 		}
 
-		// log.Default().Println("Request from", ip)
 		lb.mtx.Lock()
 		v, exists := lb.visitors[ip]
 		if !exists {
 			v = &visitor{
-				Limiter: rate.NewLimiter(100,200), // 100 requests per second, burst of 200
+				Limiter: rate.NewLimiter(1000,1500), // 400 requests per second, burst of 600
 			}
 			lb.visitors[ip] = v
 		}
@@ -181,6 +190,3 @@ func (lb *LoadBalancer) cleanupVisitors() {
 	}
 }
 
-// todo: make health endpoint?
-
-// todo: handle tls stuff
