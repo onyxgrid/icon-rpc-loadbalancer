@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"sync"
@@ -21,8 +20,9 @@ type visitor struct {
 }
 
 type LoadBalancer struct {
+	NodeTimes     map[string]time.Duration //todo use the mutex map
 	Nodes         []string
-	visitors      map[string]*visitor
+	visitors      map[string]*visitor //todo use the mutex map
 	mtx           sync.Mutex
 	cleanupTicker *time.Ticker
 	client        *http.Client
@@ -40,6 +40,8 @@ func New() *LoadBalancer {
 			MaxIdleConnsPerHost: 100,
 		},
 	}
+
+	lb.NodeTimes = make(map[string]time.Duration)
 	lb.Nodes = []string{
 		"https://ctz.solidwallet.io/api/v3",
 		"https://api.icon.community/api/v3",
@@ -53,7 +55,8 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 	outerCtx, wrappingCancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer wrappingCancel()
 
-	tried := make(map[int]bool)
+	// todo: refactor this to use
+	// tried := make(map[int]bool) //todo atm this is using the index of the previous node slice.
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -65,25 +68,17 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 		Timeout: 5 * time.Second,
 	}
 
-	for len(tried) < len(lb.Nodes) {
+	for _, node := range lb.Nodes {
 		select {
 		case <-outerCtx.Done():
 			http.Error(w, "Request timeout", http.StatusGatewayTimeout)
 			return
 		default:
-			try := rand.Intn(len(lb.Nodes))
-			if tried[try] {
-				continue
-			}
-
-			node := lb.Nodes[try]
-			tried[try] = true
-
 			ctx, cancel := context.WithTimeout(outerCtx, time.Second)
 			defer cancel()
 
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // reset the body
-			req, err := http.NewRequestWithContext(ctx, r.Method,node, r.Body)
+			req, err := http.NewRequestWithContext(ctx, r.Method, node, r.Body)
 			if err != nil {
 				cancel()
 				continue
@@ -125,7 +120,7 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 
 			if resp.StatusCode == http.StatusOK {
 				return
-			} 
+			}
 			if resp.StatusCode == http.StatusBadRequest {
 				return
 			}
@@ -135,11 +130,10 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 	http.Error(w, "All Nodes failed", http.StatusServiceUnavailable)
 }
 
-
 // todo add a func that updates the nodes every n minutes - just a loop that runs getvalidators() and checknodes() over n mintues
 
 // Middleware to apply rate limiting |
-// Takes in a http.Handler, and returns a http.Handler that applies rate limiting on that handler
+// Takes in a http.Handler, and returns a http.Handler that applies rate limiting on the returned handler
 func (lb *LoadBalancer) RateLimiter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Set CORS headers
@@ -151,7 +145,7 @@ func (lb *LoadBalancer) RateLimiter(next http.Handler) http.Handler {
 		if r.Method == "OPTIONS" {
 			return
 		}
-		
+
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			http.Error(w, "Unable to parse IP address", http.StatusInternalServerError)
@@ -162,7 +156,7 @@ func (lb *LoadBalancer) RateLimiter(next http.Handler) http.Handler {
 		v, exists := lb.visitors[ip]
 		if !exists {
 			v = &visitor{
-				Limiter: rate.NewLimiter(1000,1500), // 400 requests per second, burst of 600
+				Limiter: rate.NewLimiter(1000, 1500), // 1000 requests per second, burst of 1500
 			}
 			lb.visitors[ip] = v
 		}
@@ -191,4 +185,3 @@ func (lb *LoadBalancer) cleanupVisitors() {
 		lb.mtx.Unlock()
 	}
 }
-

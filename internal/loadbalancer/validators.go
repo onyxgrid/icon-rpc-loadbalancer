@@ -12,17 +12,14 @@ import (
 	"time"
 )
 
-// todo | handle a ratelimit response from the node. atm i think the node will than be taken out of the lb.Nodes list. But what if if the ratelimit on all the nodes is reached..
-// todo | nodes that respond with a ratelimit response should be taken out of the lb.Nodes list for a certain amount of time, and then put back in
-
-
-func (lb *LoadBalancer) GetValidators() ([]string, error) {
+// setValidators sets all the validators using the tracker.icon.community api
+func (lb *LoadBalancer) setValidators() error {
 	u := "https://tracker.icon.community/api/v1/governance/preps"
 
 	// Create a new HTTP request
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Set the request headers
@@ -32,13 +29,13 @@ func (lb *LoadBalancer) GetValidators() ([]string, error) {
 	// Send the request
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 
 	var res []any
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return nil, err
+		return err
 	}
 
 	for _, validator := range res {
@@ -52,11 +49,18 @@ func (lb *LoadBalancer) GetValidators() ([]string, error) {
 		}
 	}
 
-	return []string{}, nil
+	return nil
 }
 
 // checkNode checks if the node is healthy, if not, remove it from the lb.Nodes list
 func (lb *LoadBalancer) CheckNodes() {
+	// todo | maybe run getValidators here instead of at main func
+	err := lb.setValidators()
+	if err != nil {
+		//todo log
+		fmt.Println(err)
+	}
+
 	wg := sync.WaitGroup{}
 	for _, addr := range lb.Nodes {
 		wg.Add(1)
@@ -97,6 +101,7 @@ func (lb *LoadBalancer) CheckNodes() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 
+			start := time.Now()
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				// remove node from list
@@ -110,6 +115,7 @@ func (lb *LoadBalancer) CheckNodes() {
 				return
 			}
 			defer resp.Body.Close()
+			lb.NodeTimes[addr] = time.Since(start)
 
 			var res map[string]interface{}
 			if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
@@ -144,5 +150,8 @@ func (lb *LoadBalancer) CheckNodes() {
 		}(addr)
 	}
 	wg.Wait()
+
+	//todo | order lb.Nodes by the response times in lb.Nodetimes
+
 	fmt.Printf("%d healthy lb.Nodes\n", len(lb.Nodes))
 }
