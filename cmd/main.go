@@ -12,6 +12,8 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+// todo | add logger
+
 func main() {
 	godotenv.Load()
 	domain := os.Getenv("DOMAIN")
@@ -21,14 +23,13 @@ func main() {
 	fmt.Println("Domain is set to:", domain)
 
 	lb := loadbalancer.New()
-	lb.GetValidators()
-	lb.CheckNodes()
+	lb.CheckNodes() // todo | make this a go routine in a time loop
 
 	http.Handle("/api/v3", lb.RateLimiter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lb.ForwardRequestWithSSL(lb.Nodes, w, r)
 	})))
 
-	http.Handle("/nodes", http.HandlerFunc(lb.GetHealthyNodesAmount))
+	http.Handle("/nodes", lb.RateLimiter(http.HandlerFunc(lb.GetHealthyNodesAmount)))
 
 	certManager := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
