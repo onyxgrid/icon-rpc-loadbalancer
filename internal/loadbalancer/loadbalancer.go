@@ -20,7 +20,7 @@ type visitor struct {
 }
 
 type LoadBalancer struct {
-	NodeTimes     map[string]time.Duration //todo use the mutex map
+	NodeTimes     SafeMap
 	Nodes         []string
 	visitors      map[string]*visitor //todo use the mutex map
 	mtx           sync.Mutex
@@ -41,13 +41,25 @@ func New() *LoadBalancer {
 		},
 	}
 
-	lb.NodeTimes = make(map[string]time.Duration)
+	lb.NodeTimes = *NewSafeMap()
 	lb.Nodes = []string{
 		"https://ctz.solidwallet.io/api/v3",
 		"https://api.icon.community/api/v3",
 	}
 
 	go lb.cleanupVisitors()
+
+	// initial check
+	lb.CheckNodes()
+
+	// periodic check
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			lb.CheckNodes()
+		}
+	}()
+
 	return lb
 }
 
@@ -55,8 +67,6 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 	outerCtx, wrappingCancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer wrappingCancel()
 
-	// todo: refactor this to use
-	// tried := make(map[int]bool) //todo atm this is using the index of the previous node slice.
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -129,8 +139,6 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 	}
 	http.Error(w, "All Nodes failed", http.StatusServiceUnavailable)
 }
-
-// todo add a func that updates the nodes every n minutes - just a loop that runs getvalidators() and checknodes() over n mintues
 
 // Middleware to apply rate limiting |
 // Takes in a http.Handler, and returns a http.Handler that applies rate limiting on the returned handler

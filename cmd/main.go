@@ -23,12 +23,9 @@ func main() {
 	fmt.Println("Domain is set to:", domain)
 
 	lb := loadbalancer.New()
-	lb.CheckNodes() // todo | make this a go routine in a time loop
-
 	http.Handle("/api/v3", lb.RateLimiter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lb.ForwardRequestWithSSL(lb.Nodes, w, r)
 	})))
-
 	http.Handle("/nodes", lb.RateLimiter(http.HandlerFunc(lb.GetHealthyNodesAmount)))
 
 	certManager := autocert.Manager{
@@ -48,7 +45,6 @@ func main() {
 		MaxHeaderBytes: 1 << 20, // 1 MB
 		TLSConfig:      tlsConfig,
 	}
-
 
 	go func() {
 		if err := server.ListenAndServeTLS("", ""); err != nil {
