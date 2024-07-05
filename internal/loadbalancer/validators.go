@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -59,8 +58,7 @@ func (lb *LoadBalancer) setValidators() error {
 func (lb *LoadBalancer) CheckNodes() {
 	err := lb.setValidators()
 	if err != nil {
-		//todo log
-		fmt.Println(err)
+		lb.Logger.Printf("Error setting validators: %v\n", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -80,31 +78,42 @@ func (lb *LoadBalancer) CheckNodes() {
 			// Encode the body to JSON
 			bodyBytes, err := json.Marshal(body)
 			if err != nil {
-				// todo | log
+				lb.Logger.Printf("Error marshalling body: node: %s%v\n", err, addr)
+				return
 			}
 
 			// Create a new HTTP request
 			req, err := http.NewRequestWithContext(ctx, "POST", addr, bytes.NewBuffer(bodyBytes))
 			if err != nil {
-				// todo 
-				lb.removeNode(addr)
+				lb.Logger.Printf("Error creating request: %v node: %s\n", err, addr)
+				return
 			}
 			req.Header.Set("Content-Type", "application/json")
 
 			start := time.Now()
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				// todo | log
 				lb.removeNode(addr)
+				if lb.debug {
+					lb.Logger.Printf("Error sending request: %v node: %s\n", err, addr)
+				}
 				return
 			}
 			defer resp.Body.Close()
 			lb.NodeTimes.Set(addr, time.Since(start))
 
+			if resp.StatusCode != http.StatusOK {
+				lb.removeNode(addr)
+				if lb.debug {
+					lb.Logger.Printf("Error response status: %v node: %s\n", resp.Status, addr)
+				}
+				return
+			}
+
 			var res map[string]interface{}
 			if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-				// todo | log
 				lb.removeNode(addr)
+				lb.Logger.Printf("Error decoding response: %v node: %s\n", err, addr)
 				return
 			}
 
@@ -113,9 +122,9 @@ func (lb *LoadBalancer) CheckNodes() {
 			bn.SetString(total, 0)
 			bn.Div(bn, big.NewInt(1000000000000000000))
 
-			if bn.Cmp(big.NewInt(0)) == 0 || resp.StatusCode != http.StatusOK {
-				// todo | log
+			if bn.Cmp(big.NewInt(0)) == 0 {
 				lb.removeNode(addr)
+				lb.Logger.Printf("Node %s responded with bad response\n", addr)
 			}
 
 		}(addr)
@@ -123,5 +132,4 @@ func (lb *LoadBalancer) CheckNodes() {
 	wg.Wait()
 
 	lb.sortNodes()
-	fmt.Printf("%d healthy lb.Nodes\n", len(lb.Nodes))
 }

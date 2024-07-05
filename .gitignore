@@ -1,2 +1,4 @@
 .env
 test_requests.*
+data/*
+!data/.gitkeep

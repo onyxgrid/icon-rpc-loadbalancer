@@ -12,8 +12,6 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// todo | add logger
-
 func main() {
 	godotenv.Load()
 	domain := os.Getenv("DOMAIN")
@@ -22,7 +20,13 @@ func main() {
 	}
 	fmt.Println("Domain is set to:", domain)
 
-	lb := loadbalancer.New()
+	logfile, err := os.OpenFile("data/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %s", err)
+	}
+	defer logfile.Close()
+	lb := loadbalancer.New(logfile, true)
+
 	http.Handle("/api/v3", lb.RateLimiter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lb.ForwardRequestWithSSL(lb.Nodes, w, r)
 	})))

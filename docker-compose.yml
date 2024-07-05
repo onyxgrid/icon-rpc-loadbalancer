@@ -7,6 +7,8 @@ services:
     ports:
       - "443:443" # Adjust the ports as needed
     command: "./main"
+    volumes:
+      - ./data:/data
     env_file:
       - .env
     deploy:

@@ -3,10 +3,11 @@ package loadbalancer
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -22,14 +23,19 @@ type visitor struct {
 type LoadBalancer struct {
 	NodeTimes     SafeMap
 	Nodes         []string
-	visitors      map[string]*visitor //todo use the mutex map
+	visitors      map[string]*visitor
 	mtx           sync.Mutex
 	cleanupTicker *time.Ticker
 	client        *http.Client
+	Logger        *log.Logger
+	debug         bool
 }
 
-func New() *LoadBalancer {
+// New creates a new LoadBalancer instance - takes in a log file and a debug flag
+func New(lf *os.File, d bool) *LoadBalancer {
 	lb := &LoadBalancer{}
+	lb.debug = d
+	lb.Logger = log.New(lf, "", log.LstdFlags)
 	lb.visitors = make(map[string]*visitor)
 	lb.mtx = sync.Mutex{}
 	lb.cleanupTicker = time.NewTicker(time.Minute * 1)
@@ -109,7 +115,7 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 						continue
 					}
 				}
-				fmt.Println("error in resp node", err.Error())
+				lb.Logger.Println("error in resp node", err.Error())
 				continue
 			}
 			defer resp.Body.Close()
@@ -122,7 +128,6 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 			for k, v := range resp.Header {
 				w.Header()[k] = v
 			}
-			// for testing add a header with the node addr
 			w.Header().Set("node-used", node)
 
 			w.WriteHeader(resp.StatusCode)
@@ -134,7 +139,6 @@ func (lb *LoadBalancer) ForwardRequestWithSSL(Nodes []string, w http.ResponseWri
 			if resp.StatusCode == http.StatusBadRequest {
 				return
 			}
-			fmt.Println("failed getting response from node", node, "with status code", resp.StatusCode)
 		}
 	}
 	http.Error(w, "All Nodes failed", http.StatusServiceUnavailable)
