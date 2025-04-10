@@ -58,10 +58,11 @@ func (lb *LoadBalancer) sortNodes() {
 // remove node from list
 func (lb *LoadBalancer) removeNode(addr string) {
 	lb.mtx.Lock()
+	defer lb.mtx.Unlock()
 	for i, node := range lb.Nodes {
 		if node == addr {
 			lb.Nodes = append(lb.Nodes[:i], lb.Nodes[i+1:]...)
+			break
 		}
 	}
-	lb.mtx.Unlock()
 }
