@@ -4,13 +4,15 @@ services:
   load-balancer:
     build: .
     container_name: icon-load-balancer
-    ports:
-      - "443:443" # Adjust the ports as needed
     command: "./main"
     volumes:
       - ./data:/data
     env_file:
       - .env
+    environment:
+      - PORT=4488
+    expose:
+      - "4488"
     deploy:
       resources:
         limits:

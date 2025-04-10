@@ -42,7 +42,7 @@ func main() {
 	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "http/1.1") // Ensure HTTP/1.1 support
 
 	server := &http.Server{
-		Addr:           ":443",
+		Addr:           ":4488",
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		IdleTimeout:    120 * time.Second,
@@ -51,7 +51,7 @@ func main() {
 	}
 
 	go func() {
-		if err := server.ListenAndServeTLS("", ""); err != nil {
+		if err := server.ListenAndServe(); err != nil {
 			log.Fatalf("Server failed to start: %v", err)
 		}
 	}()
